@@ -1,0 +1,124 @@
+﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:LazyLineReader"
+        x:Class="LazyLineReader.MainWindow"
+        Title="Lazy Line Reader" Width="700" Height="540" Icon="/Resources/docfind.ico">
+  <Window.DataContext>
+    <local:MainWindowModel />
+  </Window.DataContext>
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Grid Grid.Row="1" Margin="8">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid>
+        <Grid.Resources>
+          <Style TargetType="Button">
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+          </Style>
+        </Grid.Resources>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Button VerticalAlignment="Center" Click="BtnOpenOnClick">_Open...</Button>
+        <TextBox Grid.Column="3" Width="200" MaxLines="1" FontStyle="Italic" VerticalAlignment="Center">Search</TextBox>
+        <TextBox Name="searchBox" Grid.Column="3" Width="200" MaxLines="1" Opacity="0.5" VerticalAlignment="Center"
+                 TextChanged="SearchBoxOnTextChanged" KeyUp="SearchBoxOnKeyUp" />
+        <Image Name="imgSearch" Grid.Column="3" Source="/Resources/search.png" Margin="0,0,4,0" HorizontalAlignment="Right" VerticalAlignment="Center" />
+        <Button Grid.Column="4" Margin="4,0,0,0">
+          <Button.Style>
+            <Style TargetType="Button">
+              <Style.Triggers>
+                <EventTrigger RoutedEvent="Click">
+                  <EventTrigger.Actions>
+                    <BeginStoryboard>
+                      <Storyboard>
+                        <BooleanAnimationUsingKeyFrames Storyboard.TargetProperty="ContextMenu.IsOpen">
+                          <DiscreteBooleanKeyFrame KeyTime="0:0:0" Value="True"/>
+                        </BooleanAnimationUsingKeyFrames>
+                      </Storyboard>
+                    </BeginStoryboard>
+                  </EventTrigger.Actions>
+                </EventTrigger>
+              </Style.Triggers>
+              <Setter Property="ContextMenu">
+                <Setter.Value>
+                  <ContextMenu>
+                    <MenuItem Icon="." Header="Any single character" />
+                    <MenuItem Icon="[ ]" Header="Character group" />
+                    <MenuItem Icon="[^ ]" Header="Negation" />
+                    <MenuItem Icon="[ - ]" Header="Range" />
+                    <Separator />
+                    <MenuItem Icon="*" Header="Zero or more times" />
+                    <MenuItem Icon="+" Header="One or more times" />
+                    <MenuItem Icon="?" Header="Zero or one time" />
+                    <MenuItem Icon="{}{n}" Header="n times" />
+                    <MenuItem Icon="{}{n,}" Header="at least n times" />
+                    <Separator />
+                    <MenuItem Icon="^" Header="Start at the beginning of the line" />
+                    <MenuItem Icon="$" Header="Occur before \n at the end of the line" />
+                    <Separator />
+                    <MenuItem Icon="( )" Header="Grouping" />
+                    <MenuItem Icon="|" Header="OR" />
+                    <MenuItem Icon="(?-i)" Header="Case-sensitive matching" />
+                    <MenuItem Icon="(?m)" Header="Multiline mode" />
+                  </ContextMenu>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </Button.Style>
+          <Image Source="/Resources/pending_request.png" />
+        </Button>
+        <!--<CheckBox Grid.Column="4" Margin="8,0,0,0" VerticalAlignment="Center" IsChecked="{Binding IsRegularExpression}">Match</CheckBox>-->
+      </Grid>
+      <!--<ListBox Grid.Row="2" Margin="0,8" ItemsSource="{Binding Items}">
+                <ListBox.Resources>
+                    <Style TargetType="ListBoxItem">
+                        <Style.Resources>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent" />
+                        </Style.Resources>
+                    </Style>
+                </ListBox.Resources>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBox Background="Transparent" BorderThickness="0" Text="{Binding Mode=OneTime}" IsReadOnly="True" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>-->
+      <TextBox Name="txtBox" Grid.Row="2" Margin="0,8" Text="{Binding Text, Mode=OneWay}"
+               IsReadOnly="True" HorizontalScrollBarVisibility="Visible" KeyUp="SearchBoxOnKeyUp" />
+      <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center">
+        <StackPanel.Resources>
+          <Style TargetType="Button">
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="Margin" Value="8,0" />
+          </Style>
+        </StackPanel.Resources>
+        <!--<Button>&lt;&lt; 20 lines</Button>
+                <Button>&lt; 4 lines</Button>-->
+        <Button Click="OnReadNext4">4 lines &gt;</Button>
+        <Button Click="OnReadNext20">20 lines &gt;&gt;</Button>
+      </StackPanel>
+    </Grid>
+    <StatusBar Grid.Row="2">
+      <TextBlock Text="{Binding FilePath}" />
+      <TextBlock Margin="10,0,0,0" Text="{Binding CurrentStartLineNumber}" />
+      <TextBlock Margin="10,0,0,0" Text="{Binding CurrentLineNumber}" />
+      <TextBlock Margin="10,0,0,0" Text="{Binding Encoding.WebName}" />
+    </StatusBar>
+  </Grid>
+</Window>

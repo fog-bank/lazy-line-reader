@@ -1,1 +1,1 @@
-lazy-line-reader
+Lazy Line Reader
