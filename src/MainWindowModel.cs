@@ -8,31 +8,31 @@ namespace LazyLineReader;
 
 public class MainWindowModel : INotifyPropertyChanged
 {
-	public const int MaxLines = 20;
+    public const int MaxLines = 20;
 
-	private string? filePath;
-	private Stream? stream;
-	private StreamReader? reader;
-	private long? lineNumber;
-	private readonly Deque<string> items = new(MaxLines);
-	private string text = string.Empty;
-	private MatchCollection? matches;
-	private int matchIndex;
+    private string? filePath;
+    private Stream? stream;
+    private StreamReader? reader;
+    private long? lineNumber;
+    private readonly Deque<string> items = new(MaxLines);
+    private string text = string.Empty;
+    private MatchCollection? matches;
+    private int matchIndex;
 
-	public MainWindowModel()
-	{
-		items.CollectionChanged += (sender, e) =>
-		{
-			var sb = new StringBuilder(items.Sum(x => x.Length + Environment.NewLine.Length));
+    public MainWindowModel()
+    {
+        items.CollectionChanged += (sender, e) =>
+        {
+            var sb = new StringBuilder(items.Sum(x => x.Length + Environment.NewLine.Length));
 
-			foreach (string line in items)
-				sb.Append(line).Append(Environment.NewLine);
+            foreach (string line in items)
+                sb.AppendLine(line);
 
-			Text = sb.ToString();
-		};
-	}
+            Text = sb.ToString();
+        };
+    }
 
-	public string? FilePath
+    public string? FilePath
     {
         get => filePath;
         set
@@ -76,221 +76,219 @@ public class MainWindowModel : INotifyPropertyChanged
     }
 
     public void Open(Stream stream)
-	{
-		Items.Clear();
-		Close();
+    {
+        Items.Clear();
+        Close();
 
-		this.stream = stream;
-		reader = new StreamReader(stream, true);
+        this.stream = stream;
+        reader = new StreamReader(stream, true);
 
-		for (CurrentLineNumber = 0; CurrentLineNumber < MaxLines; CurrentLineNumber++)
-		{
-			if (reader.EndOfStream)
-				break;
+        for (CurrentLineNumber = 0; CurrentLineNumber < MaxLines; CurrentLineNumber++)
+        {
+            if (reader.EndOfStream)
+                break;
 
-			items.AddLast(reader.ReadLine()!);
-		}
-		OnPropertyChanged(nameof(Encoding));
-	}
+            items.AddLast(reader.ReadLine()!);
+        }
+        OnPropertyChanged(nameof(Encoding));
+    }
 
-	public void ReadNext(int lines)
-	{
-		if (reader == null)
-			return;
+    public void ReadNext(int lines)
+    {
+        if (reader == null)
+            return;
 
-		for (int i = 0; i < lines; i++)
-		{
-			if (reader.EndOfStream)
-				break;
+        for (int i = 0; i < lines; i++)
+        {
+            if (reader.EndOfStream)
+                break;
 
-			items.AddLast(reader.ReadLine()!);
-			CurrentLineNumber++;
-		}
-	}
+            items.AddLast(reader.ReadLine()!);
+            CurrentLineNumber++;
+        }
+    }
 
-	public void Close()
-	{
-		if (reader != null)
-		{
-			reader.Close();
-			reader = null;
-		}
+    public void Close()
+    {
+        if (reader != null)
+        {
+            reader.Close();
+            reader = null;
+        }
 
-		if (stream != null)
-		{
-			stream.Close();
-			stream = null;
-		}
-	}
+        if (stream != null)
+        {
+            stream.Close();
+            stream = null;
+        }
+    }
 
-	public Match? Search(string? searchPattern)
-	{
-		if (reader != null && searchPattern != null)
-		{
-			if (matches != null)
-			{
-				if (matchIndex < matches.Count - 1)
-				{
-					matchIndex++;
-					return matches[matchIndex];
-				}
-			}
-			else
-			{
-				var regex = CreateRegex(searchPattern);
-				matches = regex.Matches(Text);
+    public Match? Search(string? searchPattern)
+    {
+        if (reader != null && searchPattern != null)
+        {
+            if (matches != null)
+            {
+                if (matchIndex < matches.Count - 1)
+                {
+                    matchIndex++;
+                    return matches[matchIndex];
+                }
+            }
+            else
+            {
+                var regex = CreateRegex(searchPattern);
+                matches = regex.Matches(Text);
 
-				if (matches.Count > 0)
-				{
-					matchIndex = 0;
-					return matches[matchIndex];
-				}
-			}
-		}
-		matches = null;
-		matchIndex = 0;
-		return null;
-	}
+                if (matches.Count > 0)
+                {
+                    matchIndex = 0;
+                    return matches[matchIndex];
+                }
+            }
+        }
+        matches = null;
+        matchIndex = 0;
+        return null;
+    }
 
-	public Match? ReadAndSearch(string? searchPattern)
-	{
-		if (reader == null || searchPattern == null)
-		{
-			matches = null;
-			matchIndex = 0;
-			return null;
-		}
+    public Match? ReadAndSearch(string? searchPattern)
+    {
+        if (reader == null || searchPattern == null)
+        {
+            matches = null;
+            matchIndex = 0;
+            return null;
+        }
 
-		var regex = CreateRegex(searchPattern);
-		var clone = items.Clone();
-		bool matched = false;
-		long readLineNumber = CurrentLineNumber.Value;
+        var regex = CreateRegex(searchPattern);
+        var clone = items.Clone();
+        bool matched = false;
+        long readLineNumber = CurrentLineNumber.Value;
 
-		while (!reader.EndOfStream)
-		{
-			clone.AddLast(reader.ReadLine()!);
-			CurrentLineNumber++;
+        while (!reader.EndOfStream)
+        {
+            clone.AddLast(reader.ReadLine()!);
+            CurrentLineNumber++;
 
-			if (regex.IsMatch(clone[^1]))
-			{
-				matched = true;
-				break;
-			}
-		}
+            if (regex.IsMatch(clone[^1]))
+            {
+                matched = true;
+                break;
+            }
+        }
 
-		items.CopyFrom(clone);
+        items.CopyFrom(clone);
 
-		if (matched)
-		{
-			if (readLineNumber < CurrentStartLineNumber)
-				return Search(searchPattern);
+        if (matched)
+        {
+            if (readLineNumber < CurrentStartLineNumber)
+                return Search(searchPattern);
 
-			matches = regex.Matches(Text, Text.IndexOf(items.Last(), StringComparison.Ordinal));
-			matchIndex = 0;
-			return matches[matchIndex];
-		}
-		else
-		{
-			matches = null;
-			matchIndex = 0;
-			return null;
-		}
-	}
+            matches = regex.Matches(Text, Text.IndexOf(items.Last(), StringComparison.Ordinal));
+            matchIndex = 0;
+            return matches[matchIndex];
+        }
+        else
+        {
+            matches = null;
+            matchIndex = 0;
+            return null;
+        }
+    }
 
-	public Task<Match?> SearchAsync(string searchPattern, CancellationToken cancellationToken)
-	{
-		if (searchPattern == null)
-			throw new ArgumentNullException(nameof(searchPattern));
+    public Task<Match?> SearchAsync(string searchPattern, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(searchPattern);
 
-		return new Task<Match?>(() =>
-		{
-			if (reader != null && searchPattern != null)
-			{
-				if (matches != null)
-				{
-					if (matchIndex < matches.Count - 1)
-					{
-						matchIndex++;
-						return matches[matchIndex];
-					}
-				}
-				else
-				{
-					var regex = CreateRegex(searchPattern);
-					matches = regex.Matches(Text);
+        return new Task<Match?>(() =>
+        {
+            if (reader != null && searchPattern != null)
+            {
+                if (matches != null)
+                {
+                    if (matchIndex < matches.Count - 1)
+                    {
+                        matchIndex++;
+                        return matches[matchIndex];
+                    }
+                }
+                else
+                {
+                    var regex = CreateRegex(searchPattern);
+                    matches = regex.Matches(Text);
 
-					if (matches.Count > 0)
-					{
-						matchIndex = 0;
-						return matches[matchIndex];
-					}
-				}
-			}
-			matches = null;
-			matchIndex = 0;
-			return null;
+                    if (matches.Count > 0)
+                    {
+                        matchIndex = 0;
+                        return matches[matchIndex];
+                    }
+                }
+            }
+            matches = null;
+            matchIndex = 0;
+            return null;
 
-		}, cancellationToken);
-	}
+        }, cancellationToken);
+    }
 
-	public Task<Match?> ReadAndSearchAsync(string searchPattern, CancellationToken cancellationToken)
-	{
-		if (searchPattern == null)
-			throw new ArgumentNullException(nameof(searchPattern));
+    public Task<Match?> ReadAndSearchAsync(string searchPattern, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(searchPattern);
 
-		var context = TaskScheduler.FromCurrentSynchronizationContext();
-		var clone = items.Clone();
-		var cloneLineNumber = CurrentLineNumber;
+        var context = TaskScheduler.FromCurrentSynchronizationContext();
+        var clone = items.Clone();
+        var cloneLineNumber = CurrentLineNumber;
 
-		var task = new Task<Match?>(() =>
-		{
-			if (reader == null || searchPattern == null)
-			{
-				matches = null;
-				matchIndex = 0;
-				return null;
-			}
+        var task = new Task<Match?>(() =>
+        {
+            if (reader == null || searchPattern == null)
+            {
+                matches = null;
+                matchIndex = 0;
+                return null;
+            }
 
-			var regex = CreateRegex(searchPattern);
-			bool matched = false;
+            var regex = CreateRegex(searchPattern);
+            bool matched = false;
 
-			while (!reader.EndOfStream)
-			{
-				clone.AddLast(reader.ReadLine()!);
-				cloneLineNumber++;
+            while (!reader.EndOfStream)
+            {
+                clone.AddLast(reader.ReadLine()!);
+                cloneLineNumber++;
 
-				if (regex.IsMatch(clone[^1]))
-				{
-					matched = true;
-					break;
-				}
-			}
-			matches = null;
-			matchIndex = 0;
+                if (regex.IsMatch(clone[^1]))
+                {
+                    matched = true;
+                    break;
+                }
+            }
+            matches = null;
+            matchIndex = 0;
 
-			Task.Factory.StartNew(() =>
-			{
-				CurrentLineNumber = cloneLineNumber;
-				items.CopyFrom(clone);
+            Task.Factory.StartNew(() =>
+            {
+                CurrentLineNumber = cloneLineNumber;
+                items.CopyFrom(clone);
 
-			}, cancellationToken, TaskCreationOptions.None, context).Wait();
+            }, cancellationToken, TaskCreationOptions.None, context).Wait();
 
-			return matched ? Search(searchPattern) : null;
+            return matched ? Search(searchPattern) : null;
 
-		}, cancellationToken);
+        }, cancellationToken);
 
-		return task;
-	}
+        return task;
+    }
 
-	private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-	{
-		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-	}
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
-	private static Regex CreateRegex(string searchPattern)
-	{
-		return new Regex(searchPattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
-	}
+    private static Regex CreateRegex(string searchPattern)
+    {
+        return new Regex(searchPattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+    }
 
-	public event PropertyChangedEventHandler? PropertyChanged;
+    public event PropertyChangedEventHandler? PropertyChanged;
 }

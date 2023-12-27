@@ -3,7 +3,7 @@
   <!-- Application -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Resources\docfind.ico</ApplicationIcon>
   </PropertyGroup>
