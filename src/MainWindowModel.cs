@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -6,26 +7,21 @@ using System.Text.RegularExpressions;
 
 namespace LazyLineReader;
 
-public class MainWindowModel : INotifyPropertyChanged
+public sealed class MainWindowModel : INotifyPropertyChanged, IDisposable
 {
     public const int MaxLines = 20;
 
-    private string? filePath;
     private Stream? stream;
-    private StreamReader? reader;
-    private long? lineNumber;
-    private readonly Deque<string> items = new(MaxLines);
-    private string text = string.Empty;
     private MatchCollection? matches;
     private int matchIndex;
 
     public MainWindowModel()
     {
-        items.CollectionChanged += (sender, e) =>
+        Items.CollectionChanged += (sender, e) =>
         {
-            var sb = new StringBuilder(items.Sum(x => x.Length + Environment.NewLine.Length));
+            var sb = new StringBuilder(Items.Sum(x => x.Length + Environment.NewLine.Length));
 
-            foreach (string line in items)
+            foreach (string line in Items)
                 sb.AppendLine(line);
 
             Text = sb.ToString();
@@ -34,98 +30,95 @@ public class MainWindowModel : INotifyPropertyChanged
 
     public string? FilePath
     {
-        get => filePath;
+        get;
         set
         {
-            filePath = value;
+            field = value;
             OnPropertyChanged();
         }
     }
 
     public long? CurrentLineNumber
     {
-        get => lineNumber;
+        get;
         set
         {
-            lineNumber = value;
+            field = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentStartLineNumber));
             OnPropertyChanged(nameof(EndOfFile));
         }
     }
 
-    public long? CurrentStartLineNumber => lineNumber.HasValue ? lineNumber - items.Count + 1 : null;
+    public long? CurrentStartLineNumber => CurrentLineNumber.HasValue ? CurrentLineNumber - Items.Count + 1 : null;
 
-    public bool EndOfFile => reader != null && reader.EndOfStream;
+    public bool EndOfFile => Reader != null && Reader.EndOfStream;
 
-    public Encoding? Encoding => reader?.CurrentEncoding;
+    public Encoding? Encoding => Reader?.CurrentEncoding;
 
-    public Deque<string> Items => items;
+    public ObservableDeque<string> Items { get; } = new(MaxLines);
 
     public string Text
     {
-        get => text;
+        get;
         set
         {
-            text = value;
+            field = value;
             matches = null;
             matchIndex = 0;
 
             OnPropertyChanged();
         }
-    }
+    } = string.Empty;
+
+    [MemberNotNull(nameof(CurrentLineNumber))]
+    private StreamReader? Reader { get; set; }
 
     public void Open(Stream stream)
     {
         Items.Clear();
-        Close();
+        Dispose();
 
         this.stream = stream;
-        reader = new StreamReader(stream, true);
+        Reader = new StreamReader(stream, true);
 
         for (CurrentLineNumber = 0; CurrentLineNumber < MaxLines; CurrentLineNumber++)
         {
-            if (reader.EndOfStream)
+            if (Reader.EndOfStream)
                 break;
 
-            items.AddLast(reader.ReadLine()!);
+            Items.AddLast(Reader.ReadLine()!);
         }
         OnPropertyChanged(nameof(Encoding));
     }
 
     public void ReadNext(int lines)
     {
-        if (reader == null)
+        if (Reader == null)
             return;
 
         for (int i = 0; i < lines; i++)
         {
-            if (reader.EndOfStream)
+            if (Reader.EndOfStream)
                 break;
 
-            items.AddLast(reader.ReadLine()!);
+            Items.AddLast(Reader.ReadLine()!);
             CurrentLineNumber++;
         }
     }
 
-    public void Close()
+    public void Dispose()
     {
-        if (reader != null)
-        {
-            reader.Close();
-            reader = null;
-        }
+        Reader?.Close();
+        Reader = null;
 
-        if (stream != null)
-        {
-            stream.Close();
-            stream = null;
-        }
+        stream?.Close();
+        stream = null;
     }
 
     public Match? Search(string? searchPattern)
     {
-        if (reader != null && searchPattern != null)
+        if (Reader != null && searchPattern != null)
         {
             if (matches != null)
             {
@@ -154,7 +147,7 @@ public class MainWindowModel : INotifyPropertyChanged
 
     public Match? ReadAndSearch(string? searchPattern)
     {
-        if (reader == null || searchPattern == null)
+        if (Reader == null || searchPattern == null)
         {
             matches = null;
             matchIndex = 0;
@@ -162,13 +155,13 @@ public class MainWindowModel : INotifyPropertyChanged
         }
 
         var regex = CreateRegex(searchPattern);
-        var clone = items.Clone();
+        var clone = Items.Clone();
         bool matched = false;
         long readLineNumber = CurrentLineNumber.Value;
 
-        while (!reader.EndOfStream)
+        while (!Reader.EndOfStream)
         {
-            clone.AddLast(reader.ReadLine()!);
+            clone.AddLast(Reader.ReadLine()!);
             CurrentLineNumber++;
 
             if (regex.IsMatch(clone[^1]))
@@ -178,14 +171,14 @@ public class MainWindowModel : INotifyPropertyChanged
             }
         }
 
-        items.CopyFrom(clone);
+        Items.CopyFrom(clone);
 
         if (matched)
         {
             if (readLineNumber < CurrentStartLineNumber)
                 return Search(searchPattern);
 
-            matches = regex.Matches(Text, Text.IndexOf(items.Last(), StringComparison.Ordinal));
+            matches = regex.Matches(Text, Text.IndexOf(Items.Last(), StringComparison.Ordinal));
             matchIndex = 0;
             return matches[matchIndex];
         }
@@ -203,7 +196,7 @@ public class MainWindowModel : INotifyPropertyChanged
 
         return new Task<Match?>(() =>
         {
-            if (reader != null && searchPattern != null)
+            if (Reader != null && searchPattern != null)
             {
                 if (matches != null)
                 {
@@ -237,12 +230,12 @@ public class MainWindowModel : INotifyPropertyChanged
         ArgumentNullException.ThrowIfNull(searchPattern);
 
         var context = TaskScheduler.FromCurrentSynchronizationContext();
-        var clone = items.Clone();
+        var clone = Items.Clone();
         var cloneLineNumber = CurrentLineNumber;
 
         var task = new Task<Match?>(() =>
         {
-            if (reader == null || searchPattern == null)
+            if (Reader == null || searchPattern == null)
             {
                 matches = null;
                 matchIndex = 0;
@@ -252,9 +245,9 @@ public class MainWindowModel : INotifyPropertyChanged
             var regex = CreateRegex(searchPattern);
             bool matched = false;
 
-            while (!reader.EndOfStream)
+            while (!Reader.EndOfStream)
             {
-                clone.AddLast(reader.ReadLine()!);
+                clone.AddLast(Reader.ReadLine()!);
                 cloneLineNumber++;
 
                 if (regex.IsMatch(clone[^1]))
@@ -269,7 +262,7 @@ public class MainWindowModel : INotifyPropertyChanged
             Task.Factory.StartNew(() =>
             {
                 CurrentLineNumber = cloneLineNumber;
-                items.CopyFrom(clone);
+                Items.CopyFrom(clone);
 
             }, cancellationToken, TaskCreationOptions.None, context).Wait();
 

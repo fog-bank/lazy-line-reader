@@ -8,6 +8,6 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         if (Current.MainWindow.DataContext is MainWindowModel model)
-            model.Close();
+            model.Dispose();
     }
 }

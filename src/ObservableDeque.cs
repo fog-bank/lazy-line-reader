@@ -1,49 +1,45 @@
 ﻿using System.Collections;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LazyLineReader;
 
-public class Deque<T> : ICollection<T>, INotifyPropertyChanged, INotifyCollectionChanged
+[SuppressMessage("Naming", "CA1710:Identifiers should have correct suffix")]
+public class ObservableDeque<T>(int maxCount) : ICollection<T>, INotifyPropertyChanged, INotifyCollectionChanged
 {
-    private T[] items;
+    private T[] items = new T[maxCount];
     private int offset;
-    private int count;
-
-    public Deque(int maxCount)
-    {
-        items = new T[maxCount];
-    }
 
     public T this[int index] => items[(index + offset) % items.Length];
 
-    public int Count => count;
+    public int Count { get; private set; }
 
     public bool IsReadOnly => false;
 
     public IEnumerator<T> GetEnumerator()
     {
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < Count; i++)
             yield return this[i];
     }
 
     public void AddLast(T item)
     {
-        var removed = items[(count + offset) % items.Length];
-        items[(count + offset) % items.Length] = item;
+        var removed = items[(Count + offset) % items.Length];
+        items[(Count + offset) % items.Length] = item;
 
-        if (count == items.Length)
+        if (Count == items.Length)
         {
             offset++;
             OnCollectionChanged(NotifyCollectionChangedAction.Remove, removed, 0);
         }
         else
         {
-            count++;
+            Count++;
             OnPropertyChanged(nameof(Count));
         }
         OnPropertyChanged("Item[]");
-        OnCollectionChanged(NotifyCollectionChangedAction.Add, item, count - 1);
+        OnCollectionChanged(NotifyCollectionChangedAction.Add, item, Count - 1);
     }
 
     public void AddFirst(T item)
@@ -51,14 +47,14 @@ public class Deque<T> : ICollection<T>, INotifyPropertyChanged, INotifyCollectio
         var removed = items[(items.Length - 1 + offset) % items.Length];
         items[(items.Length - 1 + offset) % items.Length] = item;
 
-        if (count == items.Length)
+        if (Count == items.Length)
         {
             offset--;
-            OnCollectionChanged(NotifyCollectionChangedAction.Remove, removed, count - 1);
+            OnCollectionChanged(NotifyCollectionChangedAction.Remove, removed, Count - 1);
         }
         else
         {
-            count++;
+            Count++;
             OnPropertyChanged(nameof(Count));
         }
         OnPropertyChanged("Item[]");
@@ -70,9 +66,9 @@ public class Deque<T> : ICollection<T>, INotifyPropertyChanged, INotifyCollectio
         Array.Clear(items, 0, items.Length);
         offset = 0;
 
-        if (count > 0)
+        if (Count > 0)
         {
-            count = 0;
+            Count = 0;
 
             OnPropertyChanged(nameof(Count));
             OnPropertyChanged("Item[]");
@@ -80,22 +76,22 @@ public class Deque<T> : ICollection<T>, INotifyPropertyChanged, INotifyCollectio
         }
     }
 
-    public Deque<T> Clone()
+    public ObservableDeque<T> Clone()
     {
-        var newobj = new Deque<T>(items.Length);
+        var newobj = new ObservableDeque<T>(items.Length);
 
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < Count; i++)
             newobj.items[i] = this[i];
 
-        newobj.count = count;
+        newobj.Count = Count;
         return newobj;
     }
 
-    public void CopyFrom(Deque<T> src)
+    public void CopyFrom(ObservableDeque<T> src)
     {
         items = src.items;
         offset = src.offset;
-        count = src.count;
+        Count = src.Count;
 
         OnPropertyChanged(nameof(Count));
         OnPropertyChanged("Item[]");
@@ -103,19 +99,13 @@ public class Deque<T> : ICollection<T>, INotifyPropertyChanged, INotifyCollectio
     }
 
     private void OnPropertyChanged(string propertyName)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     private void OnCollectionChanged(NotifyCollectionChangedAction action)
-    {
-        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(action));
-    }
+        => CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(action));
 
     private void OnCollectionChanged(NotifyCollectionChangedAction action, T item, int index)
-    {
-        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(action, item, index));
-    }
+        => CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(action, item, index));
 
     #region Implicit Interface Implementations
 

@@ -21,13 +21,10 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        ViewModel.Close();
+        ViewModel.Dispose();
+        ctk?.Dispose();
+        ctk = null;
 
-        if (ctk != null)
-        {
-            ctk.Dispose();
-            ctk = null;
-        }
         base.OnClosed(e);
     }
 
